@@ -6,6 +6,7 @@ use App\Models\Business;
 use App\Models\BusinessCase;
 use App\Models\BeneficialOwner;
 use App\Models\CaseDocument;
+use App\Models\Product;
 use App\Models\Review;
 use App\Models\User;
 use App\Services\AuditService;
@@ -81,6 +82,9 @@ class CaseController extends Controller
             'ubos.*.id_number' => ['required', 'string', 'max:40'],
             'ubos.*.ownership_percent' => ['required', 'numeric', 'min:0', 'max:100'],
             'ubos.*.is_pep' => ['boolean'],
+            'products' => ['required', 'array', 'min:1'],
+            'products.*.name' => ['required', 'string', 'max:120'],
+            'products.*.hs_code' => ['required', 'string', 'regex:/^\d{4}\.\d{2}(\.\d{2})?$/'],
             'business_license' => $request->input('action') === 'submit'
                 ? ['required', 'file', 'mimes:jpg,jpeg,png,pdf', 'max:10240']
                 : ['nullable', 'file', 'mimes:jpg,jpeg,png,pdf', 'max:10240'],
@@ -95,6 +99,11 @@ class CaseController extends Controller
             'business.uscc.required_if' => '中国企业必须填写统一社会信用代码。',
             'business.ein.required_if' => '美国企业必须填写 EIN。',
             'business.cnpj.required_if' => '巴西经销商必须填写 CNPJ。',
+            'products.required' => '请至少添加一个贸易产品。',
+            'products.min' => '请至少添加一个贸易产品。',
+            'products.*.name.required' => '产品名称必填。',
+            'products.*.hs_code.required' => 'HS Code 必填。',
+            'products.*.hs_code.regex' => 'HS Code 格式不正确，应为 1234.56（美国6位）或 1234.56.78（巴西NCM 8位）。',
             'business_license.required' => '提交核验时必须上传营业执照。',
             'business_license.mimes' => '营业执照仅支持 JPG、PNG、PDF 格式。',
             'business_license.max' => '营业执照文件大小不能超过 10MB。',
@@ -120,7 +129,7 @@ class CaseController extends Controller
             'status' => 'draft',
             'created_by' => $request->user()->id,
             'assigned_to' => $request->user()->id,
-            'summary' => $data['business']['scope'] ? Str::limit($data['business']['scope'], 80) : '企业身份核验申请。',
+            'summary' => ($data['business']['scope'] ?? null) ? Str::limit($data['business']['scope'], 80) : '企业身份核验申请。',
         ]);
 
         foreach ($data['ubos'] as $ubo) {
@@ -133,6 +142,14 @@ class CaseController extends Controller
                 'is_pep' => $ubo['is_pep'] ?? false,
                 'nationality' => $ubo['id_type'] === 'passport' ? '境外' : '中国',
                 'verification_status' => 'pending',
+            ]);
+        }
+
+        foreach ($data['products'] as $product) {
+            Product::create([
+                'case_id' => $case->id,
+                'name' => $product['name'],
+                'hs_code' => $product['hs_code'],
             ]);
         }
 
@@ -164,7 +181,7 @@ class CaseController extends Controller
     {
         $case->load([
             'business', 'creator', 'assignee',
-            'beneficialOwners', 'documents', 'riskAssessment', 'reviews.user',
+            'beneficialOwners', 'products', 'documents', 'riskAssessment', 'reviews.user',
         ]);
 
         return Inertia::render('Cases/Show', [
@@ -272,7 +289,7 @@ class CaseController extends Controller
 
     public function report(BusinessCase $case)
     {
-        $case->load(['business', 'beneficialOwners', 'riskAssessment', 'reviews.user', 'creator']);
+        $case->load(['business', 'beneficialOwners', 'products', 'riskAssessment', 'reviews.user', 'creator']);
 
         $this->audit->record('case.report', 'case', $case->id, ['case_no' => $case->case_no, 'label' => '生成合规报告']);
 

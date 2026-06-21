@@ -7,6 +7,7 @@ use App\Models\BeneficialOwner;
 use App\Models\Business;
 use App\Models\BusinessCase;
 use App\Models\CaseDocument;
+use App\Models\Product;
 use App\Models\Review;
 use App\Models\RiskAssessment;
 use App\Models\User;
@@ -93,6 +94,14 @@ class KybSeeder extends Seeder
         ];
 
         $caseNo = 1;
+        $sampleProducts = [
+            ['name' => '电子元器件', 'hs_code' => '8542.31'],
+            ['name' => '集成电路', 'hs_code' => '8542.32.90'],
+            ['name' => '半导体器件', 'hs_code' => '8541.43'],
+            ['name' => '高精度传感器', 'hs_code' => '9031.49.90'],
+            ['name' => '光伏组件', 'hs_code' => '8541.43.00'],
+            ['name' => '锂离子电池', 'hs_code' => '8507.60'],
+        ];
         foreach ($dataset as $row) {
             [$name, $region, $industry, $uscc, $legalRep, $capital, $establish, $scope, $adverse, $country, $ein] = $row['business'];
 
@@ -138,6 +147,17 @@ class KybSeeder extends Seeder
                     },
                     'path' => 'documents/sample.pdf', 'mime_type' => 'application/pdf',
                     'size' => rand(120000, 980000), 'ocr_status' => 'done',
+                ]);
+            }
+
+            $productStart = ($caseNo - 1) % count($sampleProducts);
+            $productCount = rand(1, 2);
+            for ($p = 0; $p < $productCount; $p++) {
+                $sp = $sampleProducts[($productStart + $p) % count($sampleProducts)];
+                Product::create([
+                    'case_id' => $case->id,
+                    'name' => $sp['name'],
+                    'hs_code' => $sp['hs_code'],
                 ]);
             }
 

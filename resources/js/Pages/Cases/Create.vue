@@ -4,7 +4,7 @@ import { Head, Link, useForm } from '@inertiajs/vue3';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
 import PageHeader from '@/Components/PageHeader.vue';
 import SectionCard from '@/Components/SectionCard.vue';
-import { Building2, Users, Paperclip, Plus, Trash2, Save, Send, ChevronLeft, AlertCircle } from 'lucide-vue-next';
+import { Building2, Users, Paperclip, Plus, Trash2, Save, Send, ChevronLeft, AlertCircle, Package } from 'lucide-vue-next';
 
 const props = defineProps({
     industries: Array,
@@ -21,6 +21,7 @@ const COUNTRIES = [
 
 const EIN_REGEX = /^\d{2}-\d{7}$/;
 const CNPJ_REGEX = /^\d{2}\.\d{3}\.\d{3}\/\d{4}-\d{2}$/;
+const HS_CODE_REGEX = /^\d{4}\.\d{2}(\.\d{2})?$/;
 
 const form = useForm({
     business: {
@@ -38,6 +39,7 @@ const form = useForm({
         country: 'CN',
     },
     ubos: [{ name: '', id_type: 'id_card', id_number: '', ownership_percent: '', is_pep: false }],
+    products: [{ name: '', hs_code: '' }],
     business_license: null,
     tax_registration: null,
     other_documents: [],
@@ -158,6 +160,17 @@ function addUbo() {
 }
 function removeUbo(i) {
     if (form.ubos.length > 1) form.ubos.splice(i, 1);
+}
+
+function addProduct() {
+    form.products.push({ name: '', hs_code: '' });
+}
+function removeProduct(i) {
+    if (form.products.length > 1) form.products.splice(i, 1);
+}
+function validateHsCode(value) {
+    if (!value) return false;
+    return HS_CODE_REGEX.test(value);
 }
 
 function handleLicenseFile(e) {
@@ -342,8 +355,52 @@ function submit(action) {
                 <p v-if="form.errors.ubos" class="mt-2 text-xs text-crimson">{{ form.errors.ubos }}</p>
             </SectionCard>
 
+            <!-- Products / HS Code -->
+            <SectionCard title="贸易产品 (HS Code)" eyebrow="SECTION 03" :icon="Package">
+                <template #action>
+                    <span class="text-xs text-ink-400">每个产品必填 HS Code</span>
+                </template>
+                <div class="space-y-3">
+                    <div v-for="(product, i) in form.products" :key="i" class="rounded-md border border-ink-700 bg-ink-900/40 p-4">
+                        <div class="mb-3 flex items-center justify-between">
+                            <span class="flex items-center gap-2 text-xs text-ink-300">
+                                <span class="flex h-5 w-5 items-center justify-center rounded-full bg-gold-400/15 font-mono text-[10px] text-gold-300">{{ i + 1 }}</span>
+                                产品 {{ i + 1 }}
+                            </span>
+                            <button v-if="form.products.length > 1" type="button" @click="removeProduct(i)" class="text-ink-400 hover:text-crimson">
+                                <Trash2 class="h-4 w-4" />
+                            </button>
+                        </div>
+                        <div class="grid gap-3 sm:grid-cols-2">
+                            <div>
+                                <label class="field-label">产品名称 <span class="text-crimson">*</span></label>
+                                <input v-model="product.name" type="text" class="field-input" placeholder="如：高精度传感器" />
+                                <p v-if="form.errors[`products.${i}.name`]" class="mt-1 text-xs text-crimson">{{ form.errors[`products.${i}.name`] }}</p>
+                            </div>
+                            <div>
+                                <label class="field-label">HS Code <span class="text-crimson">*</span></label>
+                                <input
+                                    v-model="product.hs_code"
+                                    type="text"
+                                    class="field-input font-mono"
+                                    :class="{ 'border-crimson/60': product.hs_code && !validateHsCode(product.hs_code) }"
+                                    placeholder="1234.56 或 1234.56.78"
+                                    maxlength="10"
+                                />
+                                <p class="mt-1 text-[10px] text-ink-400">美国6位：1234.56 ／ 巴西NCM 8位：1234.56.78</p>
+                                <p v-if="form.errors[`products.${i}.hs_code`]" class="mt-1 text-xs text-crimson">{{ form.errors[`products.${i}.hs_code`] }}</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <button type="button" @click="addProduct" class="btn-ghost mt-4 w-full border-dashed">
+                    <Plus class="h-4 w-4" /> 添加产品
+                </button>
+                <p v-if="form.errors.products" class="mt-2 text-xs text-crimson">{{ form.errors.products }}</p>
+            </SectionCard>
+
             <!-- Documents -->
-            <SectionCard title="证照文件" eyebrow="SECTION 03" :icon="Paperclip">
+            <SectionCard title="证照文件" eyebrow="SECTION 04" :icon="Paperclip">
                 <div class="space-y-4">
                     <div class="grid gap-4 sm:grid-cols-2">
                         <div>

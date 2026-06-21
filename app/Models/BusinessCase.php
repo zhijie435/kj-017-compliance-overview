@@ -45,6 +45,11 @@ class BusinessCase extends Model
         return $this->hasMany(BeneficialOwner::class, 'case_id');
     }
 
+    public function products(): HasMany
+    {
+        return $this->hasMany(Product::class, 'case_id');
+    }
+
     public function documents(): HasMany
     {
         return $this->hasMany(CaseDocument::class, 'case_id');

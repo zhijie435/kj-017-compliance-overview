@@ -12,7 +12,7 @@ import { formatDate, formatDateTime, formatCapital, idTypeLabel, reviewDecisionC
 import {
     ChevronLeft, FileText, Download, ShieldCheck, Search,
     Building2, Users, Paperclip, Gavel, CheckCircle2, XCircle, RotateCcw,
-    AlertTriangle, MapPin, Calendar, Briefcase, Hash,
+    AlertTriangle, MapPin, Calendar, Briefcase, Hash, Package,
 } from 'lucide-vue-next';
 
 const props = defineProps({
@@ -264,6 +264,27 @@ const businessInfo = computed(() => {
                         </table>
                     </div>
                     <EmptyState v-else title="暂无受益人" />
+                </SectionCard>
+
+                <!-- Products / HS Code -->
+                <SectionCard title="贸易产品 (HS Code)" eyebrow="PRODUCTS" :icon="Package">
+                    <div v-if="c.products?.length" class="overflow-x-auto">
+                        <table class="w-full text-sm">
+                            <thead>
+                                <tr class="text-left text-[11px] uppercase tracking-wider text-ink-400">
+                                    <th class="px-2 py-2 font-medium">产品名称</th>
+                                    <th class="px-2 py-2 font-medium">HS Code</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-ink-700/50">
+                                <tr v-for="product in c.products" :key="product.id" class="table-row-hover">
+                                    <td class="px-2 py-2.5 text-ink-100">{{ product.name }}</td>
+                                    <td class="px-2 py-2.5 font-mono text-xs text-gold-300">{{ product.hs_code }}</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <EmptyState v-else title="暂无产品" />
                 </SectionCard>
 
                 <!-- Documents -->

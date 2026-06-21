@@ -443,6 +443,30 @@
         </div>
 
         <div class="section">
+            <div class="section-title">贸易产品 (HS Code)</div>
+            @if($case->products->count())
+            <table style="width:100%; border-collapse: collapse; font-size: 13px;">
+                <thead>
+                    <tr style="background:#fafafa; text-align:left;">
+                        <th style="padding:8px 10px; border:1px solid #eee;">产品名称</th>
+                        <th style="padding:8px 10px; border:1px solid #eee;">HS Code</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach($case->products as $product)
+                    <tr>
+                        <td style="padding:8px 10px; border:1px solid #eee;">{{ $product->name }}</td>
+                        <td style="padding:8px 10px; border:1px solid #eee; font-family: monospace; color:#92400e;">{{ $product->hs_code }}</td>
+                    </tr>
+                    @endforeach
+                </tbody>
+            </table>
+            @else
+            <p style="color:#999; font-size:13px;">暂无产品</p>
+            @endif
+        </div>
+
+        <div class="section">
             <div class="section-title">风险评估</div>
             <div class="risk-section">
                 <div class="risk-score-display">
