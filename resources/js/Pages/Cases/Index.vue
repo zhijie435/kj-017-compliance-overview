@@ -56,7 +56,7 @@ function resetFilters() {
         <div class="ledger-card mb-4 flex flex-col gap-3 p-3 sm:flex-row sm:items-center">
             <div class="relative flex-1">
                 <Search class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-400" />
-                <input v-model="search" type="text" placeholder="搜索企业名称、统一社会信用代码或案件编号…"
+                <input v-model="search" type="text" placeholder="搜索企业名称、统一社会信用代码/EIN 或案件编号…"
                     class="field-input pl-9" />
             </div>
             <div class="flex items-center gap-2">
@@ -101,7 +101,7 @@ function resetFilters() {
                                     </div>
                                     <div class="min-w-0">
                                         <p class="truncate text-sm font-medium text-ink-100">{{ c.business?.name }}</p>
-                                        <p class="truncate font-mono text-[10px] text-ink-400">{{ c.business?.uscc }}</p>
+                                        <p class="truncate font-mono text-[10px] text-ink-400">{{ c.business?.country === 'US' ? c.business?.ein : c.business?.uscc }}</p>
                                     </div>
                                 </div>
                             </td>

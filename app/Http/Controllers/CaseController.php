@@ -30,7 +30,8 @@ class CaseController extends Controller
             ->when($filters['q'] ?? null, function ($q, $value) {
                 $q->whereHas('business', function ($b) use ($value) {
                     $b->where('name', 'like', "%{$value}%")
-                        ->orWhere('uscc', 'like', "%{$value}%");
+                        ->orWhere('uscc', 'like', "%{$value}%")
+                        ->orWhere('ein', 'like', "%{$value}%");
                 })->orWhere('case_no', 'like', "%{$value}%");
             })
             ->when($filters['status'] ?? null, fn ($q, $v) => $q->where('status', $v))
