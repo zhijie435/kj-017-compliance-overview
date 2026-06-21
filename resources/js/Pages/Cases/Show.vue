@@ -61,16 +61,30 @@ function maskId(num) {
     return s.slice(0, 3) + '••••' + s.slice(-4);
 }
 
+const COUNTRY_LABELS = { CN: '中国', US: '美国', OTHER: '其他' };
+
 const businessInfo = computed(() => {
     const b = c.value.business || {};
-    return [
-        { label: '统一社会信用代码', value: b.uscc, mono: true, icon: Hash },
-        { label: '法定代表人', value: b.legal_rep, icon: Users },
-        { label: '注册资本', value: formatCapital(b.registered_capital), icon: Briefcase },
-        { label: '成立日期', value: formatDate(b.establish_date), icon: Calendar },
-        { label: '所属行业', value: b.industry, icon: Briefcase },
-        { label: '注册地区', value: b.region, icon: MapPin },
-    ];
+    const info = [];
+
+    const country = COUNTRY_LABELS[b.country] || b.country || '—';
+    info.push({ label: '注册国家', value: country, icon: MapPin });
+
+    if (b.country === 'US' && b.ein) {
+        info.push({ label: 'EIN (雇主识别号)', value: b.ein, mono: true, icon: Hash });
+    } else if (b.country === 'CN' && b.uscc) {
+        info.push({ label: '统一社会信用代码', value: b.uscc, mono: true, icon: Hash });
+    } else if (b.uscc) {
+        info.push({ label: '企业注册号', value: b.uscc, mono: true, icon: Hash });
+    }
+
+    info.push({ label: '法定代表人', value: b.legal_rep, icon: Users });
+    info.push({ label: '注册资本', value: formatCapital(b.registered_capital), icon: Briefcase });
+    info.push({ label: '成立日期', value: formatDate(b.establish_date), icon: Calendar });
+    info.push({ label: '所属行业', value: b.industry, icon: Briefcase });
+    info.push({ label: '注册地区', value: b.region, icon: MapPin });
+
+    return info;
 });
 </script>
 

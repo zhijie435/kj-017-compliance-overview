@@ -9,12 +9,22 @@ import { Building2, Users, Paperclip, Plus, Trash2, Save, Send, ChevronLeft, Ale
 const props = defineProps({
     industries: Array,
     regions: Array,
+    countries: Array,
 });
+
+const COUNTRIES = [
+    { value: 'CN', label: '中国', hasUscc: true, hasEin: false },
+    { value: 'US', label: '美国', hasUscc: false, hasEin: true },
+    { value: 'OTHER', label: '其他', hasUscc: false, hasEin: false },
+];
+
+const EIN_REGEX = /^\d{2}-\d{7}$/;
 
 const form = useForm({
     business: {
         name: '',
         uscc: '',
+        ein: '',
         legal_rep: '',
         registered_capital: '',
         establish_date: '',
@@ -22,11 +32,31 @@ const form = useForm({
         scope: '',
         industry: '',
         region: '',
+        country: 'CN',
     },
     ubos: [{ name: '', id_type: 'id_card', id_number: '', ownership_percent: '', is_pep: false }],
     documents: [],
     action: 'draft',
 });
+
+const currentCountry = () => COUNTRIES.find(c => c.value === form.business.country) || COUNTRIES[0];
+const showUscc = () => currentCountry().hasUscc;
+const showEin = () => currentCountry().hasEin;
+
+function validateEin(value) {
+    if (!showEin()) return true;
+    if (!value) return false;
+    return EIN_REGEX.test(value);
+}
+
+function formatEinInput(e) {
+    let value = e.target.value.replace(/\D/g, '');
+    if (value.length >= 2) {
+        value = value.slice(0, 2) + '-' + value.slice(2, 9);
+    }
+    e.target.value = value;
+    form.business.ein = value;
+}
 
 const ownershipSum = computed(() => form.ubos.reduce((s, u) => s + (Number(u.ownership_percent) || 0), 0));
 const ownershipWarn = computed(() => {
@@ -81,9 +111,29 @@ function submit(action) {
                         <p v-if="form.errors['business.name']" class="mt-1 text-xs text-crimson">{{ form.errors['business.name'] }}</p>
                     </div>
                     <div>
+                        <label class="field-label">注册国家 <span class="text-crimson">*</span></label>
+                        <select v-model="form.business.country" class="field-input">
+                            <option v-for="c in COUNTRIES" :key="c.value" :value="c.value">{{ c.label }}</option>
+                        </select>
+                        <p v-if="form.errors['business.country']" class="mt-1 text-xs text-crimson">{{ form.errors['business.country'] }}</p>
+                    </div>
+                    <div v-if="showUscc()">
                         <label class="field-label">统一社会信用代码 <span class="text-crimson">*</span></label>
                         <input v-model="form.business.uscc" type="text" class="field-input font-mono" placeholder="18 位代码" />
                         <p v-if="form.errors['business.uscc']" class="mt-1 text-xs text-crimson">{{ form.errors['business.uscc'] }}</p>
+                    </div>
+                    <div v-if="showEin()">
+                        <label class="field-label">EIN (雇主识别号) <span class="text-crimson">*</span></label>
+                        <input
+                            v-model="form.business.ein"
+                            type="text"
+                            class="field-input font-mono"
+                            placeholder="XX-XXXXXXX"
+                            maxlength="10"
+                            @input="formatEinInput"
+                        />
+                        <p class="mt-1 text-[10px] text-ink-400">格式：2 位数字 - 7 位数字，如 12-3456789</p>
+                        <p v-if="form.errors['business.ein']" class="mt-1 text-xs text-crimson">{{ form.errors['business.ein'] }}</p>
                     </div>
                     <div>
                         <label class="field-label">法定代表人 <span class="text-crimson">*</span></label>

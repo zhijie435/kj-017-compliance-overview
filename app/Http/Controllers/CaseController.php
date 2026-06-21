@@ -52,7 +52,8 @@ class CaseController extends Controller
                 '软件和信息技术服务业', '金融业', '电子商务', '跨境贸易', '制造业',
                 '研究和试验发展', '虚拟资产', '投资与控股', '供应链管理', '文化创意',
             ],
-            'regions' => ['北京', '上海', '深圳', '广州', '杭州', '成都', '武汉', '南京', 'KY', 'VG'],
+            'regions' => ['北京', '上海', '深圳', '广州', '杭州', '成都', '武汉', '南京', 'KY', 'VG', 'US'],
+            'countries' => ['CN', 'US', 'OTHER'],
         ]);
     }
 
@@ -60,7 +61,9 @@ class CaseController extends Controller
     {
         $data = $request->validate([
             'business.name' => ['required', 'string', 'max:120'],
-            'business.uscc' => ['required', 'string', 'max:64'],
+            'business.country' => ['required', 'string', 'in:CN,US,OTHER'],
+            'business.uscc' => ['required_if:business.country,CN', 'nullable', 'string', 'max:64'],
+            'business.ein' => ['required_if:business.country,US', 'nullable', 'string', 'max:16', 'regex:/^\d{2}-\d{7}$/'],
             'business.legal_rep' => ['required', 'string', 'max:60'],
             'business.registered_capital' => ['nullable', 'string', 'max:60'],
             'business.establish_date' => ['nullable', 'date'],
@@ -75,6 +78,10 @@ class CaseController extends Controller
             'ubos.*.ownership_percent' => ['required', 'numeric', 'min:0', 'max:100'],
             'ubos.*.is_pep' => ['boolean'],
             'action' => ['required', 'in:draft,submit'],
+        ], [
+            'business.ein.regex' => 'EIN 格式不正确，应为 XX-XXXXXXX 格式。',
+            'business.uscc.required_if' => '中国企业必须填写统一社会信用代码。',
+            'business.ein.required_if' => '美国企业必须填写 EIN。',
         ]);
 
         $business = Business::create($data['business']);

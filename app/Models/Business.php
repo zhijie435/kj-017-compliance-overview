@@ -7,8 +7,8 @@ use Illuminate\Database\Eloquent\Model;
 class Business extends Model
 {
     protected $fillable = [
-        'name', 'uscc', 'legal_rep', 'registered_capital', 'establish_date',
-        'address', 'scope', 'industry', 'region',
+        'name', 'uscc', 'ein', 'legal_rep', 'registered_capital', 'establish_date',
+        'address', 'scope', 'industry', 'region', 'country',
     ];
 
     protected function casts(): array
