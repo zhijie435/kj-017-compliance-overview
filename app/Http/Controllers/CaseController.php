@@ -6,6 +6,7 @@ use App\Models\Business;
 use App\Models\BusinessCase;
 use App\Models\BeneficialOwner;
 use App\Models\CaseDocument;
+use App\Models\Review;
 use App\Models\User;
 use App\Services\AuditService;
 use App\Services\RiskService;
@@ -133,7 +134,7 @@ class CaseController extends Controller
         ]);
 
         return Inertia::render('Cases/Show', [
-            'caseData' => $case,
+            'case' => $case,
         ]);
     }
 
