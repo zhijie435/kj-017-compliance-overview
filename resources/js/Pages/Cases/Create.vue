@@ -1,5 +1,5 @@
 <script setup>
-import { computed } from 'vue';
+import { computed, watch } from 'vue';
 import { Head, Link, useForm } from '@inertiajs/vue3';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
 import PageHeader from '@/Components/PageHeader.vue';
@@ -39,23 +39,50 @@ const form = useForm({
     action: 'draft',
 });
 
-const currentCountry = () => COUNTRIES.find(c => c.value === form.business.country) || COUNTRIES[0];
-const showUscc = () => currentCountry().hasUscc;
-const showEin = () => currentCountry().hasEin;
+const currentCountry = computed(() => COUNTRIES.find(c => c.value === form.business.country) || COUNTRIES[0]);
+const showUscc = computed(() => currentCountry.value.hasUscc);
+const showEin = computed(() => currentCountry.value.hasEin);
+
+watch(
+    () => form.business.country,
+    (newCountry, oldCountry) => {
+        if (newCountry !== oldCountry) {
+            if (newCountry === 'US') {
+                form.business.uscc = '';
+            } else if (newCountry === 'CN') {
+                form.business.ein = '';
+            } else {
+                form.business.uscc = '';
+                form.business.ein = '';
+            }
+            form.clearErrors('business.uscc');
+            form.clearErrors('business.ein');
+        }
+    }
+);
+
+watch(
+    () => form.business.ein,
+    (newVal, oldVal) => {
+        if (!showEin.value) return;
+        if (newVal === oldVal) return;
+
+        const digits = (newVal || '').replace(/\D/g, '');
+        let formatted = digits;
+        if (digits.length >= 2) {
+            formatted = digits.slice(0, 2) + '-' + digits.slice(2, 9);
+        }
+
+        if (formatted !== newVal) {
+            form.business.ein = formatted;
+        }
+    }
+);
 
 function validateEin(value) {
-    if (!showEin()) return true;
+    if (!showEin.value) return true;
     if (!value) return false;
     return EIN_REGEX.test(value);
-}
-
-function formatEinInput(e) {
-    let value = e.target.value.replace(/\D/g, '');
-    if (value.length >= 2) {
-        value = value.slice(0, 2) + '-' + value.slice(2, 9);
-    }
-    e.target.value = value;
-    form.business.ein = value;
 }
 
 const ownershipSum = computed(() => form.ubos.reduce((s, u) => s + (Number(u.ownership_percent) || 0), 0));
@@ -117,12 +144,12 @@ function submit(action) {
                         </select>
                         <p v-if="form.errors['business.country']" class="mt-1 text-xs text-crimson">{{ form.errors['business.country'] }}</p>
                     </div>
-                    <div v-if="showUscc()">
+                    <div v-if="showUscc">
                         <label class="field-label">统一社会信用代码 <span class="text-crimson">*</span></label>
                         <input v-model="form.business.uscc" type="text" class="field-input font-mono" placeholder="18 位代码" />
                         <p v-if="form.errors['business.uscc']" class="mt-1 text-xs text-crimson">{{ form.errors['business.uscc'] }}</p>
                     </div>
-                    <div v-if="showEin()">
+                    <div v-if="showEin">
                         <label class="field-label">EIN (雇主识别号) <span class="text-crimson">*</span></label>
                         <input
                             v-model="form.business.ein"
@@ -130,7 +157,6 @@ function submit(action) {
                             class="field-input font-mono"
                             placeholder="XX-XXXXXXX"
                             maxlength="10"
-                            @input="formatEinInput"
                         />
                         <p class="mt-1 text-[10px] text-ink-400">格式：2 位数字 - 7 位数字，如 12-3456789</p>
                         <p v-if="form.errors['business.ein']" class="mt-1 text-xs text-crimson">{{ form.errors['business.ein'] }}</p>

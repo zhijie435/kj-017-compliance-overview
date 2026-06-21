@@ -18,6 +18,20 @@ class Business extends Model
         ];
     }
 
+    public function setEinAttribute($value)
+    {
+        if ($value === null || $value === '') {
+            $this->attributes['ein'] = $value;
+            return;
+        }
+        $digits = preg_replace('/\D/', '', $value);
+        if (strlen($digits) >= 2) {
+            $this->attributes['ein'] = substr($digits, 0, 2) . '-' . substr($digits, 2, 7);
+        } else {
+            $this->attributes['ein'] = $value;
+        }
+    }
+
     public function cases()
     {
         return $this->hasMany(BusinessCase::class);
