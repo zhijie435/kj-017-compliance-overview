@@ -96,3 +96,25 @@ export const ID_TYPE_LABELS = {
 export function idTypeLabel(value) {
     return ID_TYPE_LABELS[value] || value || '—';
 }
+
+export const DOCUMENT_TYPE_LABELS = {
+    business_license: '营业执照',
+    tax_registration: '税务登记证',
+    id_card: '法人身份证件',
+    articles: '公司章程',
+    other: '其他材料',
+};
+
+export const DOCUMENT_TYPES_REQUIRED = ['business_license', 'tax_registration'];
+
+export function documentTypeLabel(value) {
+    return DOCUMENT_TYPE_LABELS[value] || value || '—';
+}
+
+export function documentReviewStatusLabel(status) {
+    return {
+        approved: '审核通过',
+        rejected: '审核驳回',
+        pending: '待审核',
+    }[status] || '待审核';
+}

@@ -38,7 +38,9 @@ const form = useForm({
         country: 'CN',
     },
     ubos: [{ name: '', id_type: 'id_card', id_number: '', ownership_percent: '', is_pep: false }],
-    documents: [],
+    business_license: null,
+    tax_registration: null,
+    other_documents: [],
     action: 'draft',
 });
 
@@ -158,8 +160,30 @@ function removeUbo(i) {
     if (form.ubos.length > 1) form.ubos.splice(i, 1);
 }
 
-function handleFiles(e) {
-    form.documents = Array.from(e.target.files);
+function handleLicenseFile(e) {
+    const files = e.target.files;
+    if (files && files.length > 0) {
+        form.business_license = files[0];
+    }
+}
+
+function handleTaxFile(e) {
+    const files = e.target.files;
+    if (files && files.length > 0) {
+        form.tax_registration = files[0];
+    }
+}
+
+function handleOtherFiles(e) {
+    form.other_documents = Array.from(e.target.files);
+}
+
+function removeLicense() {
+    form.business_license = null;
+}
+
+function removeTax() {
+    form.tax_registration = null;
 }
 
 function submit(action) {
@@ -319,16 +343,77 @@ function submit(action) {
             </SectionCard>
 
             <!-- Documents -->
-            <SectionCard title="证照文件" eyebrow="SECTION 03 · 可选" :icon="Paperclip">
-                <label class="flex cursor-pointer items-center justify-center rounded-md border border-dashed border-ink-600 bg-ink-900/30 px-6 py-8 text-center transition hover:border-gold-400/40">
-                    <input type="file" multiple @change="handleFiles" class="hidden" accept="image/*,.pdf" />
-                    <div>
-                        <Paperclip class="mx-auto h-6 w-6 text-ink-400" />
-                        <p class="mt-2 text-sm text-ink-200">点击上传营业执照、法人证件等材料</p>
-                        <p class="mt-1 text-xs text-ink-400">支持图片 / PDF,可多选</p>
-                        <p v-if="form.documents.length" class="mt-2 font-mono text-xs text-gold-300">已选择 {{ form.documents.length }} 个文件</p>
+            <SectionCard title="证照文件" eyebrow="SECTION 03" :icon="Paperclip">
+                <div class="space-y-4">
+                    <div class="grid gap-4 sm:grid-cols-2">
+                        <div>
+                            <label class="field-label">营业执照 <span class="text-crimson">*</span></label>
+                            <div v-if="!form.business_license">
+                                <label class="flex cursor-pointer items-center justify-center rounded-md border border-dashed border-ink-600 bg-ink-900/30 px-4 py-6 text-center transition hover:border-gold-400/40">
+                                    <input type="file" @change="handleLicenseFile" class="hidden" accept="image/*,.pdf" />
+                                    <div>
+                                        <Paperclip class="mx-auto h-5 w-5 text-ink-400" />
+                                        <p class="mt-2 text-xs text-ink-300">点击上传营业执照</p>
+                                        <p class="mt-1 text-[10px] text-ink-500">支持图片 / PDF</p>
+                                    </div>
+                                </label>
+                            </div>
+                            <div v-else class="flex items-center gap-3 rounded-md border border-gold-400/30 bg-gold-400/5 p-3">
+                                <div class="flex h-8 w-8 items-center justify-center rounded-md bg-gold-400/15 text-gold-300">
+                                    <Paperclip class="h-4 w-4" />
+                                </div>
+                                <div class="min-w-0 flex-1">
+                                    <p class="truncate text-sm text-ink-100">{{ form.business_license.name }}</p>
+                                    <p class="text-[11px] text-ink-400">{{ Math.round(form.business_license.size/1024) }} KB</p>
+                                </div>
+                                <button type="button" @click="removeLicense" class="text-ink-400 hover:text-crimson">
+                                    <Trash2 class="h-4 w-4" />
+                                </button>
+                            </div>
+                            <p v-if="form.errors.business_license" class="mt-1 text-xs text-crimson">{{ form.errors.business_license }}</p>
+                        </div>
+
+                        <div>
+                            <label class="field-label">税务登记证 <span class="text-crimson">*</span></label>
+                            <div v-if="!form.tax_registration">
+                                <label class="flex cursor-pointer items-center justify-center rounded-md border border-dashed border-ink-600 bg-ink-900/30 px-4 py-6 text-center transition hover:border-gold-400/40">
+                                    <input type="file" @change="handleTaxFile" class="hidden" accept="image/*,.pdf" />
+                                    <div>
+                                        <Paperclip class="mx-auto h-5 w-5 text-ink-400" />
+                                        <p class="mt-2 text-xs text-ink-300">点击上传税务登记证</p>
+                                        <p class="mt-1 text-[10px] text-ink-500">支持图片 / PDF</p>
+                                    </div>
+                                </label>
+                            </div>
+                            <div v-else class="flex items-center gap-3 rounded-md border border-gold-400/30 bg-gold-400/5 p-3">
+                                <div class="flex h-8 w-8 items-center justify-center rounded-md bg-gold-400/15 text-gold-300">
+                                    <Paperclip class="h-4 w-4" />
+                                </div>
+                                <div class="min-w-0 flex-1">
+                                    <p class="truncate text-sm text-ink-100">{{ form.tax_registration.name }}</p>
+                                    <p class="text-[11px] text-ink-400">{{ Math.round(form.tax_registration.size/1024) }} KB</p>
+                                </div>
+                                <button type="button" @click="removeTax" class="text-ink-400 hover:text-crimson">
+                                    <Trash2 class="h-4 w-4" />
+                                </button>
+                            </div>
+                            <p v-if="form.errors.tax_registration" class="mt-1 text-xs text-crimson">{{ form.errors.tax_registration }}</p>
+                        </div>
                     </div>
-                </label>
+
+                    <div>
+                        <label class="field-label">其他材料（可选）</label>
+                        <label class="flex cursor-pointer items-center justify-center rounded-md border border-dashed border-ink-600 bg-ink-900/30 px-4 py-5 text-center transition hover:border-gold-400/40">
+                            <input type="file" multiple @change="handleOtherFiles" class="hidden" accept="image/*,.pdf" />
+                            <div>
+                                <Paperclip class="mx-auto h-5 w-5 text-ink-400" />
+                                <p class="mt-2 text-xs text-ink-300">点击上传公司章程、法人证件等其他材料</p>
+                                <p class="mt-1 text-[10px] text-ink-500">支持图片 / PDF,可多选</p>
+                                <p v-if="form.other_documents.length" class="mt-2 font-mono text-xs text-gold-300">已选择 {{ form.other_documents.length }} 个文件</p>
+                            </div>
+                        </label>
+                    </div>
+                </div>
             </SectionCard>
 
             <!-- Actions -->

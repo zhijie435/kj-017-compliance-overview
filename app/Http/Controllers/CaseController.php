@@ -11,6 +11,7 @@ use App\Models\User;
 use App\Services\AuditService;
 use App\Services\RiskService;
 use Illuminate\Http\Request;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Str;
 use Inertia\Inertia;
 
@@ -80,12 +81,28 @@ class CaseController extends Controller
             'ubos.*.id_number' => ['required', 'string', 'max:40'],
             'ubos.*.ownership_percent' => ['required', 'numeric', 'min:0', 'max:100'],
             'ubos.*.is_pep' => ['boolean'],
+            'business_license' => $request->input('action') === 'submit'
+                ? ['required', 'file', 'mimes:jpg,jpeg,png,pdf', 'max:10240']
+                : ['nullable', 'file', 'mimes:jpg,jpeg,png,pdf', 'max:10240'],
+            'tax_registration' => $request->input('action') === 'submit'
+                ? ['required', 'file', 'mimes:jpg,jpeg,png,pdf', 'max:10240']
+                : ['nullable', 'file', 'mimes:jpg,jpeg,png,pdf', 'max:10240'],
+            'other_documents' => ['nullable', 'array'],
+            'other_documents.*' => ['file', 'mimes:jpg,jpeg,png,pdf', 'max:10240'],
             'action' => ['required', 'in:draft,submit'],
         ], [
             'business.ein.regex' => 'EIN 格式不正确，应为 XX-XXXXXXX 格式。',
             'business.uscc.required_if' => '中国企业必须填写统一社会信用代码。',
             'business.ein.required_if' => '美国企业必须填写 EIN。',
             'business.cnpj.required_if' => '巴西经销商必须填写 CNPJ。',
+            'business_license.required' => '提交核验时必须上传营业执照。',
+            'business_license.mimes' => '营业执照仅支持 JPG、PNG、PDF 格式。',
+            'business_license.max' => '营业执照文件大小不能超过 10MB。',
+            'tax_registration.required' => '提交核验时必须上传税务登记证。',
+            'tax_registration.mimes' => '税务登记证仅支持 JPG、PNG、PDF 格式。',
+            'tax_registration.max' => '税务登记证文件大小不能超过 10MB。',
+            'other_documents.*.mimes' => '附件仅支持 JPG、PNG、PDF 格式。',
+            'other_documents.*.max' => '附件文件大小不能超过 10MB。',
         ]);
 
         if (!empty($data['business']['cnpj'])) {
@@ -119,18 +136,17 @@ class CaseController extends Controller
             ]);
         }
 
-        if ($request->hasFile('documents')) {
-            foreach ($request->file('documents') as $file) {
-                $path = $file->store('documents', 'private');
-                CaseDocument::create([
-                    'case_id' => $case->id,
-                    'type' => 'other',
-                    'filename' => $file->getClientOriginalName(),
-                    'path' => $path,
-                    'mime_type' => $file->getMimeType(),
-                    'size' => $file->getSize(),
-                    'ocr_status' => 'pending',
-                ]);
+        if ($request->hasFile('business_license')) {
+            $this->storeDocument($case->id, $request->file('business_license'), CaseDocument::TYPE_BUSINESS_LICENSE);
+        }
+
+        if ($request->hasFile('tax_registration')) {
+            $this->storeDocument($case->id, $request->file('tax_registration'), CaseDocument::TYPE_TAX_REGISTRATION);
+        }
+
+        if ($request->hasFile('other_documents')) {
+            foreach ($request->file('other_documents') as $file) {
+                $this->storeDocument($case->id, $file, CaseDocument::TYPE_OTHER);
             }
         }
 
@@ -171,10 +187,56 @@ class CaseController extends Controller
         $data = $request->validate([
             'decision' => ['required', 'in:approve,reject,return'],
             'comment' => ['required', 'string', 'max:1000'],
+            'document_reviews' => ['nullable', 'array'],
+            'document_reviews.*.id' => ['required', 'exists:case_documents,id'],
+            'document_reviews.*.review_status' => ['required', 'in:approved,rejected,pending'],
+            'document_reviews.*.review_comment' => ['nullable', 'string', 'max:500'],
         ]);
 
         $user = $request->user();
         $level = $user->isManager() ? 'final' : 'first';
+
+        $hasLicense = $case->documents()->where('type', CaseDocument::TYPE_BUSINESS_LICENSE)->exists();
+        $hasTaxCert = $case->documents()->where('type', CaseDocument::TYPE_TAX_REGISTRATION)->exists();
+
+        if ($data['decision'] === 'approve') {
+            if (!$hasLicense) {
+                return back()->withErrors(['decision' => '审核通过前必须上传营业执照。'])->withInput();
+            }
+            if (!$hasTaxCert) {
+                return back()->withErrors(['decision' => '审核通过前必须上传税务登记证。'])->withInput();
+            }
+
+            if ($level === 'final') {
+                $licenseApproved = $case->documents()
+                    ->where('type', CaseDocument::TYPE_BUSINESS_LICENSE)
+                    ->where('review_status', 'approved')
+                    ->exists();
+                $taxApproved = $case->documents()
+                    ->where('type', CaseDocument::TYPE_TAX_REGISTRATION)
+                    ->where('review_status', 'approved')
+                    ->exists();
+
+                if (!$licenseApproved) {
+                    return back()->withErrors(['decision' => '终审通过前营业执照必须审核通过。'])->withInput();
+                }
+                if (!$taxApproved) {
+                    return back()->withErrors(['decision' => '终审通过前税务登记证必须审核通过。'])->withInput();
+                }
+            }
+        }
+
+        if (!empty($data['document_reviews'])) {
+            foreach ($data['document_reviews'] as $docReview) {
+                $doc = CaseDocument::find($docReview['id']);
+                if ($doc && $doc->case_id === $case->id) {
+                    $doc->update([
+                        'review_status' => $docReview['review_status'],
+                        'review_comment' => $docReview['review_comment'] ?? null,
+                    ]);
+                }
+            }
+        }
 
         Review::create([
             'case_id' => $case->id,
@@ -272,5 +334,21 @@ class CaseController extends Controller
         }
 
         return (string) $verifier === $expected;
+    }
+
+    private function storeDocument(int $caseId, UploadedFile $file, string $type): CaseDocument
+    {
+        $path = $file->store('documents', 'private');
+
+        return CaseDocument::create([
+            'case_id' => $caseId,
+            'type' => $type,
+            'filename' => $file->getClientOriginalName(),
+            'path' => $path,
+            'mime_type' => $file->getMimeType(),
+            'size' => $file->getSize(),
+            'ocr_status' => 'pending',
+            'review_status' => 'pending',
+        ]);
     }
 }

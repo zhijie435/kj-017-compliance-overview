@@ -8,7 +8,7 @@ import StatusBadge from '@/Components/StatusBadge.vue';
 import RiskBadge from '@/Components/RiskBadge.vue';
 import RiskGauge from '@/Components/RiskGauge.vue';
 import EmptyState from '@/Components/EmptyState.vue';
-import { formatDate, formatDateTime, formatCapital, idTypeLabel, reviewDecisionChip, REVIEW_LEVEL_META } from '@/utils/kyb';
+import { formatDate, formatDateTime, formatCapital, idTypeLabel, reviewDecisionChip, REVIEW_LEVEL_META, documentTypeLabel, documentReviewStatusLabel, DOCUMENT_TYPES_REQUIRED } from '@/utils/kyb';
 import {
     ChevronLeft, FileText, Download, ShieldCheck, Search,
     Building2, Users, Paperclip, Gavel, CheckCircle2, XCircle, RotateCcw,
@@ -42,12 +42,78 @@ const reviewLevelHint = computed(() => {
     return '初审决议';
 });
 
-const reviewForm = useForm({ decision: 'approve', comment: '' });
+const reviewForm = useForm({ decision: 'approve', comment: '', document_reviews: [] });
+
+const requiredDocsStatus = computed(() => {
+    const docs = c.value.documents || [];
+    const result = {};
+    DOCUMENT_TYPES_REQUIRED.forEach(type => {
+        const doc = docs.find(d => d.type === type);
+        result[type] = {
+            uploaded: !!doc,
+            review_status: doc?.review_status || 'missing',
+            label: documentTypeLabel(type),
+        };
+    });
+    return result;
+});
+
+const groupedDocuments = computed(() => {
+    const docs = c.value.documents || [];
+    const required = [];
+    const others = [];
+    docs.forEach(doc => {
+        if (DOCUMENT_TYPES_REQUIRED.includes(doc.type)) {
+            required.push(doc);
+        } else {
+            others.push(doc);
+        }
+    });
+    return { required, others };
+});
+
+function initDocumentReviews() {
+    const docs = c.value.documents || [];
+    reviewForm.document_reviews = docs.map(doc => ({
+        id: doc.id,
+        review_status: doc.review_status || 'pending',
+        review_comment: doc.review_comment || '',
+    }));
+}
+
+function getDocReviewStatus(docId) {
+    const found = reviewForm.document_reviews.find(d => d.id === docId);
+    return found?.review_status || 'pending';
+}
+
+function getDocReviewComment(docId) {
+    const found = reviewForm.document_reviews.find(d => d.id === docId);
+    return found?.review_comment || '';
+}
+
+function updateDocReviewStatus(docId, status) {
+    const found = reviewForm.document_reviews.find(d => d.id === docId);
+    if (found) {
+        found.review_status = status;
+    }
+}
+
+function updateDocReviewComment(docId, comment) {
+    const found = reviewForm.document_reviews.find(d => d.id === docId);
+    if (found) {
+        found.review_comment = comment;
+    }
+}
+
 function submitReview() {
     reviewForm.post(route('cases.review', c.value.id), {
         preserveScroll: true,
         onSuccess: () => reviewForm.reset(),
     });
+}
+
+if (canReview.value) {
+    initDocumentReviews();
 }
 
 function runScreen() {
@@ -202,16 +268,106 @@ const businessInfo = computed(() => {
 
                 <!-- Documents -->
                 <SectionCard title="证照文件" eyebrow="DOCUMENTS" :icon="Paperclip">
-                    <div v-if="c.documents?.length" class="space-y-2">
-                        <div v-for="doc in c.documents" :key="doc.id" class="flex items-center gap-3 rounded-md border border-ink-700/60 bg-ink-900/40 p-3">
-                            <div class="flex h-8 w-8 items-center justify-center rounded-md bg-ink-700 text-gold-300">
-                                <Paperclip class="h-4 w-4" />
+                    <div class="mb-4 grid gap-2 sm:grid-cols-2">
+                        <div v-for="(status, type) in requiredDocsStatus" :key="type"
+                            class="flex items-center gap-2 rounded-md border px-3 py-2 text-xs"
+                            :class="status.uploaded
+                                ? (status.review_status === 'approved' ? 'border-emerald2/30 bg-emerald2/5' : status.review_status === 'rejected' ? 'border-crimson/30 bg-crimson/5' : 'border-gold-400/30 bg-gold-400/5')
+                                : 'border-ink-700/60 bg-ink-900/40'">
+                            <CheckCircle2 v-if="status.uploaded && status.review_status === 'approved'" class="h-4 w-4 text-emerald2" />
+                            <XCircle v-else-if="status.uploaded && status.review_status === 'rejected'" class="h-4 w-4 text-crimson" />
+                            <AlertTriangle v-else-if="status.uploaded" class="h-4 w-4 text-amber2" />
+                            <span v-else class="flex h-4 w-4 items-center justify-center rounded-full border border-dashed border-ink-500 text-[9px] text-ink-500">!</span>
+                            <span class="text-ink-200">{{ status.label }}</span>
+                            <span class="ml-auto"
+                                :class="status.uploaded
+                                    ? (status.review_status === 'approved' ? 'text-emerald2' : status.review_status === 'rejected' ? 'text-crimson' : 'text-amber2')
+                                    : 'text-ink-500'">
+                                {{ status.uploaded ? documentReviewStatusLabel(status.review_status) : '未上传' }}
+                            </span>
+                        </div>
+                    </div>
+
+                    <div v-if="groupedDocuments.required.length || groupedDocuments.others.length" class="space-y-4">
+                        <div v-if="groupedDocuments.required.length">
+                            <p class="eyebrow mb-2">必备证照</p>
+                            <div class="space-y-2">
+                                <div v-for="doc in groupedDocuments.required" :key="doc.id" class="rounded-md border border-ink-700/60 bg-ink-900/40 p-3">
+                                    <div class="flex items-center gap-3">
+                                        <div class="flex h-8 w-8 items-center justify-center rounded-md bg-gold-400/15 text-gold-300">
+                                            <FileText class="h-4 w-4" />
+                                        </div>
+                                        <div class="min-w-0 flex-1">
+                                            <div class="flex items-center gap-2">
+                                                <span class="chip border-gold-400/30 bg-gold-400/10 text-gold-300">{{ documentTypeLabel(doc.type) }}</span>
+                                                <span class="chip" :class="doc.review_status === 'approved'
+                                                    ? 'border-emerald2/30 bg-emerald2/10 text-emerald2'
+                                                    : doc.review_status === 'rejected'
+                                                    ? 'border-crimson/30 bg-crimson/10 text-crimson'
+                                                    : 'border-ink-500/50 bg-ink-700/40 text-ink-300'">
+                                                    {{ documentReviewStatusLabel(doc.review_status) }}
+                                                </span>
+                                            </div>
+                                            <p class="mt-1 truncate text-sm text-ink-100">{{ doc.filename }}</p>
+                                            <p class="text-[11px] text-ink-400">{{ doc.mime_type }} · {{ doc.size ? Math.round(doc.size/1024) + ' KB' : '' }}</p>
+                                        </div>
+                                    </div>
+                                    <div v-if="canReview" class="mt-3 border-t border-ink-700/60 pt-3">
+                                        <div class="mb-2">
+                                            <label class="field-label text-[11px]">证照审核</label>
+                                            <div class="flex gap-2">
+                                                <button type="button" @click="updateDocReviewStatus(doc.id, 'approved')"
+                                                    class="flex-1 rounded-md border px-2 py-1.5 text-[11px] transition"
+                                                    :class="getDocReviewStatus(doc.id) === 'approved'
+                                                        ? 'border-emerald2/50 bg-emerald2/10 text-emerald2'
+                                                        : 'border-ink-600 text-ink-300 hover:bg-ink-800'">
+                                                    <CheckCircle2 class="mx-auto mb-0.5 h-3.5 w-3.5" /> 通过
+                                                </button>
+                                                <button type="button" @click="updateDocReviewStatus(doc.id, 'rejected')"
+                                                    class="flex-1 rounded-md border px-2 py-1.5 text-[11px] transition"
+                                                    :class="getDocReviewStatus(doc.id) === 'rejected'
+                                                        ? 'border-crimson/50 bg-crimson/10 text-crimson'
+                                                        : 'border-ink-600 text-ink-300 hover:bg-ink-800'">
+                                                    <XCircle class="mx-auto mb-0.5 h-3.5 w-3.5" /> 驳回
+                                                </button>
+                                                <button type="button" @click="updateDocReviewStatus(doc.id, 'pending')"
+                                                    class="flex-1 rounded-md border px-2 py-1.5 text-[11px] transition"
+                                                    :class="getDocReviewStatus(doc.id) === 'pending'
+                                                        ? 'border-amber2/50 bg-amber2/10 text-amber2'
+                                                        : 'border-ink-600 text-ink-300 hover:bg-ink-800'">
+                                                    <RotateCcw class="mx-auto mb-0.5 h-3.5 w-3.5" /> 待定
+                                                </button>
+                                            </div>
+                                        </div>
+                                        <textarea
+                                            :value="getDocReviewComment(doc.id)"
+                                            @input="updateDocReviewComment(doc.id, $event.target.value)"
+                                            rows="2"
+                                            class="field-input resize-none text-xs"
+                                            placeholder="证照审核意见（可选）…"></textarea>
+                                    </div>
+                                    <p v-if="doc.review_comment && !canReview" class="mt-2 text-[11px] text-ink-400">审核意见：{{ doc.review_comment }}</p>
+                                </div>
                             </div>
-                            <div class="min-w-0 flex-1">
-                                <p class="truncate text-sm text-ink-100">{{ doc.filename }}</p>
-                                <p class="text-[11px] text-ink-400">{{ doc.mime_type }} · {{ doc.size ? Math.round(doc.size/1024) + ' KB' : '' }}</p>
+                        </div>
+
+                        <div v-if="groupedDocuments.others.length">
+                            <p class="eyebrow mb-2">其他材料</p>
+                            <div class="space-y-2">
+                                <div v-for="doc in groupedDocuments.others" :key="doc.id" class="flex items-center gap-3 rounded-md border border-ink-700/60 bg-ink-900/40 p-3">
+                                    <div class="flex h-8 w-8 items-center justify-center rounded-md bg-ink-700 text-ink-300">
+                                        <Paperclip class="h-4 w-4" />
+                                    </div>
+                                    <div class="min-w-0 flex-1">
+                                        <div class="flex items-center gap-2">
+                                            <span class="chip border-ink-500/50 bg-ink-700/40 text-ink-300">{{ documentTypeLabel(doc.type) }}</span>
+                                        </div>
+                                        <p class="mt-0.5 truncate text-sm text-ink-100">{{ doc.filename }}</p>
+                                        <p class="text-[11px] text-ink-400">{{ doc.mime_type }} · {{ doc.size ? Math.round(doc.size/1024) + ' KB' : '' }}</p>
+                                    </div>
+                                    <span class="chip border-ink-500/50 bg-ink-700/40 text-ink-300">{{ doc.ocr_status || 'pending' }}</span>
+                                </div>
                             </div>
-                            <span class="chip border-ink-500/50 bg-ink-700/40 text-ink-300">{{ doc.ocr_status || 'pending' }}</span>
                         </div>
                     </div>
                     <EmptyState v-else title="未上传证照" description="该案件暂无证照文件" />
@@ -292,6 +448,7 @@ const businessInfo = computed(() => {
                                     <RotateCcw class="mx-auto mb-1 h-4 w-4" /> 退回
                                 </button>
                             </div>
+                            <p v-if="reviewForm.errors.decision" class="mt-1 text-xs text-crimson">{{ reviewForm.errors.decision }}</p>
                         </div>
                         <div>
                             <label class="field-label">审核意见 <span class="text-crimson">*</span></label>
