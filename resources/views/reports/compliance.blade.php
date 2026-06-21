@@ -361,9 +361,36 @@
                     <span class="info-value">{{ $case->business->name }}</span>
                 </div>
                 <div class="info-item">
+                    <span class="info-label">注册国家</span>
+                    <span class="info-value">
+                        @if($case->business->country === 'CN') 中国
+                        @elseif($case->business->country === 'US') 美国
+                        @elseif($case->business->country === 'BR') 巴西
+                        @else 其他
+                        @endif
+                    </span>
+                </div>
+                @if($case->business->country === 'CN' && $case->business->uscc)
+                <div class="info-item">
                     <span class="info-label">统一社会信用代码</span>
                     <span class="info-value">{{ $case->business->uscc }}</span>
                 </div>
+                @elseif($case->business->country === 'US' && $case->business->ein)
+                <div class="info-item">
+                    <span class="info-label">EIN (雇主识别号)</span>
+                    <span class="info-value">{{ $case->business->ein }}</span>
+                </div>
+                @elseif($case->business->country === 'BR' && $case->business->cnpj)
+                <div class="info-item">
+                    <span class="info-label">CNPJ (巴西经销商税号)</span>
+                    <span class="info-value">{{ $case->business->cnpj }}</span>
+                </div>
+                @elseif($case->business->uscc)
+                <div class="info-item">
+                    <span class="info-label">企业注册号</span>
+                    <span class="info-value">{{ $case->business->uscc }}</span>
+                </div>
+                @endif
                 <div class="info-item">
                     <span class="info-label">法定代表人</span>
                     <span class="info-value">{{ $case->business->legal_rep }}</span>

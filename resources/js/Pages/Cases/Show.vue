@@ -61,7 +61,7 @@ function maskId(num) {
     return s.slice(0, 3) + '••••' + s.slice(-4);
 }
 
-const COUNTRY_LABELS = { CN: '中国', US: '美国', OTHER: '其他' };
+const COUNTRY_LABELS = { CN: '中国', US: '美国', BR: '巴西', OTHER: '其他' };
 
 const businessInfo = computed(() => {
     const b = c.value.business || {};
@@ -74,6 +74,8 @@ const businessInfo = computed(() => {
         info.push({ label: 'EIN (雇主识别号)', value: b.ein, mono: true, icon: Hash });
     } else if (b.country === 'CN' && b.uscc) {
         info.push({ label: '统一社会信用代码', value: b.uscc, mono: true, icon: Hash });
+    } else if (b.country === 'BR' && b.cnpj) {
+        info.push({ label: 'CNPJ (巴西经销商税号)', value: b.cnpj, mono: true, icon: Hash });
     } else if (b.uscc) {
         info.push({ label: '企业注册号', value: b.uscc, mono: true, icon: Hash });
     }

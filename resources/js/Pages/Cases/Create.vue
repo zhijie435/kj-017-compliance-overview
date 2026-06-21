@@ -13,18 +13,21 @@ const props = defineProps({
 });
 
 const COUNTRIES = [
-    { value: 'CN', label: '中国', hasUscc: true, hasEin: false },
-    { value: 'US', label: '美国', hasUscc: false, hasEin: true },
-    { value: 'OTHER', label: '其他', hasUscc: false, hasEin: false },
+    { value: 'CN', label: '中国', hasUscc: true, hasEin: false, hasCnpj: false },
+    { value: 'US', label: '美国', hasUscc: false, hasEin: true, hasCnpj: false },
+    { value: 'BR', label: '巴西', hasUscc: false, hasEin: false, hasCnpj: true },
+    { value: 'OTHER', label: '其他', hasUscc: false, hasEin: false, hasCnpj: false },
 ];
 
 const EIN_REGEX = /^\d{2}-\d{7}$/;
+const CNPJ_REGEX = /^\d{2}\.\d{3}\.\d{3}\/\d{4}-\d{2}$/;
 
 const form = useForm({
     business: {
         name: '',
         uscc: '',
         ein: '',
+        cnpj: '',
         legal_rep: '',
         registered_capital: '',
         establish_date: '',
@@ -42,6 +45,7 @@ const form = useForm({
 const currentCountry = computed(() => COUNTRIES.find(c => c.value === form.business.country) || COUNTRIES[0]);
 const showUscc = computed(() => currentCountry.value.hasUscc);
 const showEin = computed(() => currentCountry.value.hasEin);
+const showCnpj = computed(() => currentCountry.value.hasCnpj);
 
 watch(
     () => form.business.country,
@@ -49,14 +53,21 @@ watch(
         if (newCountry !== oldCountry) {
             if (newCountry === 'US') {
                 form.business.uscc = '';
+                form.business.cnpj = '';
             } else if (newCountry === 'CN') {
+                form.business.ein = '';
+                form.business.cnpj = '';
+            } else if (newCountry === 'BR') {
+                form.business.uscc = '';
                 form.business.ein = '';
             } else {
                 form.business.uscc = '';
                 form.business.ein = '';
+                form.business.cnpj = '';
             }
             form.clearErrors('business.uscc');
             form.clearErrors('business.ein');
+            form.clearErrors('business.cnpj');
         }
     }
 );
@@ -83,6 +94,49 @@ function validateEin(value) {
     if (!showEin.value) return true;
     if (!value) return false;
     return EIN_REGEX.test(value);
+}
+
+watch(
+    () => form.business.cnpj,
+    (newVal, oldVal) => {
+        if (!showCnpj.value) return;
+        if (newVal === oldVal) return;
+
+        const digits = (newVal || '').replace(/\D/g, '');
+        let formatted = digits;
+        if (digits.length >= 2) formatted = digits.slice(0, 2) + '.' + digits.slice(2, 5);
+        if (digits.length >= 5) formatted = formatted + '.' + digits.slice(5, 8);
+        if (digits.length >= 8) formatted = formatted + '/' + digits.slice(8, 12);
+        if (digits.length >= 12) formatted = formatted + '-' + digits.slice(12, 14);
+
+        if (formatted !== newVal) {
+            form.business.cnpj = formatted;
+        }
+    }
+);
+
+function checkCnpjDigit(numbers, expected) {
+    const length = numbers.length;
+    let verifier = 0;
+    for (let i = 1; i <= length; ++i) {
+        const multiplier = (i >= 9) ? i - 7 : i + 1;
+        verifier += parseInt(numbers[length - i]) * multiplier;
+    }
+    verifier = 11 - (verifier % 11);
+    if (verifier >= 10) verifier = 0;
+    return String(verifier) === expected;
+}
+
+function validateCnpj(value) {
+    if (!showCnpj.value) return true;
+    if (!value) return false;
+    const digits = value.replace(/\D/g, '');
+    if (digits.length !== 14) return false;
+    if (/^(\d)\1+$/.test(digits)) return false;
+
+    if (!checkCnpjDigit(digits.slice(0, 12), digits[12])) return false;
+    if (!checkCnpjDigit(digits.slice(0, 13), digits[13])) return false;
+    return true;
 }
 
 const ownershipSum = computed(() => form.ubos.reduce((s, u) => s + (Number(u.ownership_percent) || 0), 0));
@@ -160,6 +214,18 @@ function submit(action) {
                         />
                         <p class="mt-1 text-[10px] text-ink-400">格式：2 位数字 - 7 位数字，如 12-3456789</p>
                         <p v-if="form.errors['business.ein']" class="mt-1 text-xs text-crimson">{{ form.errors['business.ein'] }}</p>
+                    </div>
+                    <div v-if="showCnpj">
+                        <label class="field-label">CNPJ (巴西经销商税号) <span class="text-crimson">*</span></label>
+                        <input
+                            v-model="form.business.cnpj"
+                            type="text"
+                            class="field-input font-mono"
+                            placeholder="XX.XXX.XXX/XXXX-XX"
+                            maxlength="18"
+                        />
+                        <p class="mt-1 text-[10px] text-ink-400">格式：14 位数字，含校验位，如 12.345.678/0001-90</p>
+                        <p v-if="form.errors['business.cnpj']" class="mt-1 text-xs text-crimson">{{ form.errors['business.cnpj'] }}</p>
                     </div>
                     <div>
                         <label class="field-label">法定代表人 <span class="text-crimson">*</span></label>

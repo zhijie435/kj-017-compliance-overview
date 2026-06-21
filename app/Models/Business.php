@@ -7,7 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 class Business extends Model
 {
     protected $fillable = [
-        'name', 'uscc', 'ein', 'legal_rep', 'registered_capital', 'establish_date',
+        'name', 'uscc', 'ein', 'cnpj', 'legal_rep', 'registered_capital', 'establish_date',
         'address', 'scope', 'industry', 'region', 'country',
     ];
 
@@ -29,6 +29,21 @@ class Business extends Model
             $this->attributes['ein'] = substr($digits, 0, 2) . '-' . substr($digits, 2, 7);
         } else {
             $this->attributes['ein'] = $value;
+        }
+    }
+
+    public function setCnpjAttribute($value)
+    {
+        if ($value === null || $value === '') {
+            $this->attributes['cnpj'] = $value;
+            return;
+        }
+        $digits = preg_replace('/\D/', '', $value);
+        if (strlen($digits) === 14) {
+            $this->attributes['cnpj'] = substr($digits, 0, 2) . '.' . substr($digits, 2, 3) . '.'
+                . substr($digits, 5, 3) . '/' . substr($digits, 8, 4) . '-' . substr($digits, 12, 2);
+        } else {
+            $this->attributes['cnpj'] = $value;
         }
     }
 

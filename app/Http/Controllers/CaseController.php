@@ -31,7 +31,8 @@ class CaseController extends Controller
                 $q->whereHas('business', function ($b) use ($value) {
                     $b->where('name', 'like', "%{$value}%")
                         ->orWhere('uscc', 'like', "%{$value}%")
-                        ->orWhere('ein', 'like', "%{$value}%");
+                        ->orWhere('ein', 'like', "%{$value}%")
+                        ->orWhere('cnpj', 'like', "%{$value}%");
                 })->orWhere('case_no', 'like', "%{$value}%");
             })
             ->when($filters['status'] ?? null, fn ($q, $v) => $q->where('status', $v))
@@ -53,8 +54,8 @@ class CaseController extends Controller
                 '软件和信息技术服务业', '金融业', '电子商务', '跨境贸易', '制造业',
                 '研究和试验发展', '虚拟资产', '投资与控股', '供应链管理', '文化创意',
             ],
-            'regions' => ['北京', '上海', '深圳', '广州', '杭州', '成都', '武汉', '南京', 'KY', 'VG', 'US'],
-            'countries' => ['CN', 'US', 'OTHER'],
+            'regions' => ['北京', '上海', '深圳', '广州', '杭州', '成都', '武汉', '南京', 'KY', 'VG', 'US', 'BR'],
+            'countries' => ['CN', 'US', 'BR', 'OTHER'],
         ]);
     }
 
@@ -62,9 +63,10 @@ class CaseController extends Controller
     {
         $data = $request->validate([
             'business.name' => ['required', 'string', 'max:120'],
-            'business.country' => ['required', 'string', 'in:CN,US,OTHER'],
+            'business.country' => ['required', 'string', 'in:CN,US,BR,OTHER'],
             'business.uscc' => ['required_if:business.country,CN', 'nullable', 'string', 'max:64'],
             'business.ein' => ['required_if:business.country,US', 'nullable', 'string', 'max:16', 'regex:/^\d{2}-\d{7}$/'],
+            'business.cnpj' => ['required_if:business.country,BR', 'nullable', 'string', 'max:32'],
             'business.legal_rep' => ['required', 'string', 'max:60'],
             'business.registered_capital' => ['nullable', 'string', 'max:60'],
             'business.establish_date' => ['nullable', 'date'],
@@ -83,7 +85,15 @@ class CaseController extends Controller
             'business.ein.regex' => 'EIN 格式不正确，应为 XX-XXXXXXX 格式。',
             'business.uscc.required_if' => '中国企业必须填写统一社会信用代码。',
             'business.ein.required_if' => '美国企业必须填写 EIN。',
+            'business.cnpj.required_if' => '巴西经销商必须填写 CNPJ。',
         ]);
+
+        if (!empty($data['business']['cnpj'])) {
+            $cnpjDigits = preg_replace('/\D/', '', $data['business']['cnpj']);
+            if (!$this->validateCnpj($cnpjDigits)) {
+                return back()->withErrors(['business.cnpj' => 'CNPJ 校验位不正确，请检查输入。'])->withInput();
+            }
+        }
 
         $business = Business::create($data['business']);
 
@@ -224,5 +234,43 @@ class CaseController extends Controller
 
         $case->submitted_at = $case->submitted_at ?? now();
         $case->save();
+    }
+
+    private function validateCnpj(string $cnpj): bool
+    {
+        if (strlen($cnpj) !== 14) {
+            return false;
+        }
+
+        if (preg_match('/(\d)\1{13}/', $cnpj)) {
+            return false;
+        }
+
+        if (!$this->checkCnpjDigit(substr($cnpj, 0, 12), $cnpj[12])) {
+            return false;
+        }
+        if (!$this->checkCnpjDigit(substr($cnpj, 0, 13), $cnpj[13])) {
+            return false;
+        }
+
+        return true;
+    }
+
+    private function checkCnpjDigit(string $numbers, string $expected): bool
+    {
+        $length = strlen($numbers);
+        $verifier = 0;
+
+        for ($i = 1; $i <= $length; ++$i) {
+            $multiplier = ($i >= 9) ? $i - 7 : $i + 1;
+            $verifier += $numbers[$length - $i] * $multiplier;
+        }
+
+        $verifier = 11 - ($verifier % 11);
+        if ($verifier >= 10) {
+            $verifier = 0;
+        }
+
+        return (string) $verifier === $expected;
     }
 }
