@@ -166,19 +166,19 @@ class CaseController extends Controller
             'comment' => $data['comment'],
         ]);
 
-        if ($level === 'final') {
-            $case->status = $data['decision'] === 'approve' ? 'approved' : 'rejected';
+        $case->status = match ($data['decision']) {
+            'approve' => $level === 'final' ? 'approved' : 'reviewing',
+            'reject' => 'rejected',
+            'return' => 'draft',
+            default => $case->status,
+        };
+
+        if (in_array($case->status, ['approved', 'rejected'], true)) {
             $case->decided_at = now();
-        } else {
-            $case->status = match ($data['decision']) {
-                'approve' => 'reviewing',
-                'reject' => 'rejected',
-                'return' => 'draft',
-                default => $case->status,
-            };
-            if ($data['decision'] === 'approve') {
-                $case->assigned_to = User::where('role', 'manager')->value('id') ?? $case->assigned_to;
-            }
+        }
+
+        if ($data['decision'] === 'approve' && $level === 'first') {
+            $case->assigned_to = User::where('role', 'manager')->value('id') ?? $case->assigned_to;
         }
         $case->save();
 
@@ -206,7 +206,14 @@ class CaseController extends Controller
         $assessment = $this->risk->screen($case);
         $case->risk_score = $assessment->score;
         $case->risk_level = $assessment->level;
-        $case->status = $assessment->level === 'prohibited' ? 'pending_review' : 'pending_review';
+
+        if ($assessment->level === 'prohibited') {
+            $case->status = 'rejected';
+            $case->decided_at = now();
+        } else {
+            $case->status = 'pending_review';
+        }
+
         $case->submitted_at = $case->submitted_at ?? now();
         $case->save();
     }
